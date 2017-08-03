@@ -41,11 +41,11 @@ class ProjectAttachmentsController < ApplicationController
         render_404
       end
     else
-      @projects ||= Project.all
+      @projects ||= Project.visible
       # group projects by enabled modules
       container_types_to_projects = Hash.new { |h, k| h[k] = [] }
       @projects.each do |project|
-        enabled_module_names = project.enabled_modules.map(&:name)
+        enabled_module_names = project.enabled_modules.pluck(:name)
         container_types = @@module_names_to_container_types.select { |k, _| enabled_module_names.include?(k.to_s) }.map { |k, v| v } << 'versions'
         container_types_to_projects[container_types] << project
       end
@@ -64,8 +64,11 @@ class ProjectAttachmentsController < ApplicationController
                                                                         :all_words => @all_words,
                                                                         :titles_only => @titles_only)
       end
+      # binding.pry
       # use only select (not select!) to have a compatibility with ruby 1.8.7
-      @all_attachments = @all_attachments.select {|a| a.visible? }
+      unless User.current.admin?
+        @all_attachments = @all_attachments.select {|a| a.visible? }
+      end
       @all_attachments.sort! {|a1, a2| a2.created_on <=> a1.created_on }
     end
     @limit = per_page_option

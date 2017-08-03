@@ -61,7 +61,7 @@ module RedmineAllFiles
                   ) AND (
                    #{ statement }
                   ) AND a.container_type IN (#{ containers.map { |c| self.sanitize(c) }.join(', ') })
-            ORDER BY a.created_on
+            ORDER BY a.created_on DESC
           SQL
 
         end
