@@ -29,7 +29,7 @@ class ProjectAttachmentsController < ApplicationController
         # user select container types from available
         @scope = @container_types.select {|t| params[t]}
         @scope = @container_types if @scope.empty?
-        @all_attachments = Attachment.search_attachments_for_projects [@project],
+        @all_attachments = Attachment.search_attachments_for_projects [@project.id],
                                                                       @tokens,
                                                                       :scope => @scope,
                                                                       :all_words => @all_words,
@@ -41,13 +41,15 @@ class ProjectAttachmentsController < ApplicationController
         render_404
       end
     else
-      @projects ||= Project.visible
+      @projects ||= Project.visible.
+          includes(:enabled_modules).
+          references(:enabled_modules)
       # group projects by enabled modules
       container_types_to_projects = Hash.new { |h, k| h[k] = [] }
       @projects.each do |project|
-        enabled_module_names = project.enabled_modules.pluck(:name)
+        enabled_module_names = project.enabled_modules.map(&:name)
         container_types = @@module_names_to_container_types.select { |k, _| enabled_module_names.include?(k.to_s) }.map { |k, v| v } << 'versions'
-        container_types_to_projects[container_types] << project
+        container_types_to_projects[container_types] << project.id
       end
       @container_types = @@module_names_to_container_types.map { |k, v| v } << 'versions'
       # user select container types from available

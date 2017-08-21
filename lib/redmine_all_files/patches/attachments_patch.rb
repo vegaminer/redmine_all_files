@@ -7,7 +7,7 @@ module RedmineAllFiles
 
       module ClassMethods
         def search_attachments_for_projects projects, tokens = [], options = {}
-          project_ids = projects.map(&:id)
+          project_ids = projects
           return [] if options[:scope].blank? || project_ids.blank?
           sql_project_ids = "(#{ project_ids.join(', ') })"
 
