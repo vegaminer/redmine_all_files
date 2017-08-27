@@ -57,26 +57,32 @@ class ProjectAttachmentsController < ApplicationController
       @scope = @container_types if @scope.empty?
       @all_attachments = []
       # search attachments into
+      # cond = Attachment.selection
+      cond = " "
       container_types_to_projects.each do |scope, projects|
         # user select container types from available
         scope = scope.select { |t| @scope.include? t }
-        @all_attachments.concat Attachment.search_attachments_for_projects(projects,
+
+        cond << Attachment.search_attachments_for_projects_bis(projects,
                                                                         @tokens,
                                                                         :scope => scope,
                                                                         :all_words => @all_words,
                                                                         :titles_only => @titles_only)
+        cond << ' OR '
       end
-      # binding.pry
+      cond << '(1 = 2) '
+
+      @all_attachments= Attachment.where( cond).selection.order_by_created_on
       # use only select (not select!) to have a compatibility with ruby 1.8.7
       unless User.current.admin?
         @all_attachments = @all_attachments.select {|a| a.visible? }
       end
-      @all_attachments.sort! {|a1, a2| a2.created_on <=> a1.created_on }
     end
     @limit = per_page_option
-    @attachments_count = @all_attachments.count
-    @attachments_pages = Paginator.new self, @attachments_count, @limit, params[:page]
-    @offset = @attachments_pages.current.offset
-    @attachments = @all_attachments[@offset..(@offset + @limit - 1)]
+    @attachments_count = @all_attachments.size
+    @attachments_pages = Paginator.new @attachments_count, @limit, params[:page]
+    @offset = @attachments_pages.offset
+
+    @attachments = User.current.admin? ? @all_attachments.offset(@offset).limit(@limit) : @all_attachments[@offset..(@offset + @limit - 1)]
   end
 end

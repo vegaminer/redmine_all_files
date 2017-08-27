@@ -65,6 +65,65 @@ module RedmineAllFiles
           SQL
 
         end
+        def search_attachments_for_projects_bis projects, tokens = [], options = {}
+          project_ids = projects
+          return [] if options[:scope].blank? || project_ids.blank?
+          sql_project_ids = "(#{ project_ids.join(', ') })"
+
+          containers = options[:scope].map { |container| container.singularize.camelize }
+
+          statement = '1=1'
+          if tokens.any?
+            token_clauses = tokens.map do |token|
+              str = "((LOWER(attachments.filename) LIKE %{token} #{ 'OR LOWER(attachments.description) LIKE %{token}' unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
+              options[:scope].each do |option|
+                val = option[0]
+                case val
+                  when 'i' then str += " OR (LOWER(#{val}.subject) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
+                  when 'n', 'd' then str += " OR (LOWER(#{val}.title) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
+                  when 'p' then str += " OR (LOWER(#{val}.name) LIKE %{token} OR LOWER(#{val}.identifier) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
+                  when 'w' then str += " OR (LOWER(#{val}.title) LIKE %{token})" % { :token => sanitize("%#{token.downcase}%") }
+                  when 'v' then str += " OR (LOWER(#{val}.name) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
+                  else
+                end
+
+              end
+              str += ')'
+              str
+
+            end
+            statement = token_clauses.join(options[:all_words] ? ' AND ' : ' OR ')
+            statement = self.sanitize true if statement.blank?
+          end
+
+
+          sql= "((d.project_id IN #{sql_project_ids} OR
+                   i.project_id IN #{sql_project_ids} OR
+                   n.project_id IN #{sql_project_ids} OR
+                   v.project_id IN #{sql_project_ids} OR
+                   ww.project_id IN #{sql_project_ids} OR
+                   p.id IN #{sql_project_ids}
+                  ) AND (
+                   #{ statement }
+                  ) AND attachments.container_type IN (#{ containers.map { |c| self.sanitize(c) }.join(', ') }) )
+
+          "
+          sql
+        end
+
+        def order_by_created_on
+         order("attachments.created_on DESC")
+        end
+
+        def selection
+          select("  d.title AS document_title, i.subject AS issue_subject, t.name AS issue_tracker_name, n.title AS new_title, v.name AS version_name, w.title AS wiki_page_title, ww.project_id AS wiki_project_id, p.name AS attachment_project_name, p.id AS attachment_project_id, attachments.*  ").
+              joins(" LEFT JOIN documents d ON d.id = attachments.container_id AND attachments.container_type = 'Document' ").
+              joins("LEFT JOIN issues i ON i.id = attachments.container_id AND attachments.container_type = 'Issue' LEFT JOIN trackers t ON t.id = i.tracker_id ").
+              joins("LEFT JOIN news n ON n.id = attachments.container_id AND attachments.container_type = 'News'").
+              joins("LEFT JOIN versions v ON v.id = attachments.container_id AND attachments.container_type = 'Version'").
+              joins(" LEFT JOIN wiki_pages w ON w.id = attachments.container_id AND attachments.container_type = 'WikiPage' LEFT JOIN wikis ww ON ww.id = w.wiki_id").
+              joins("LEFT JOIN projects p ON p.id = d.project_id OR p.id = i.project_id OR p.id = n.project_id OR p.id = v.project_id OR p.id = ww.project_id OR p.id = attachments.container_id AND attachments.container_type = 'Project'")
+        end
       end
     end
   end
