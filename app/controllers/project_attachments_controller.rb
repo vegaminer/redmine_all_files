@@ -79,7 +79,7 @@ class ProjectAttachmentsController < ApplicationController
       end
     end
     @limit = per_page_option
-    @attachments_count = @all_attachments.size
+    @attachments_count = User.current.admin? ? Attachment.count : @all_attachments.size
     @attachments_pages = Paginator.new @attachments_count, @limit, params[:page]
     @offset = @attachments_pages.offset
 
