@@ -35,7 +35,9 @@ class ProjectAttachmentsController < ApplicationController
                                                                       :all_words => @all_words,
                                                                       :titles_only => @titles_only
         # use only select (not select!) to have a compatibility with ruby 1.8.7
-        @all_attachments = @all_attachments.select {|a| a.visible? }
+        unless User.current.admin?
+          @all_attachments = @all_attachments.select {|a| a.visible? }
+        end
         @all_attachments.sort! {|a1, a2| a2.created_on <=> a1.created_on }
       rescue ActiveRecord::RecordNotFound
         render_404
@@ -64,10 +66,10 @@ class ProjectAttachmentsController < ApplicationController
         scope = scope.select { |t| @scope.include? t }
 
         cond << Attachment.search_attachments_for_projects_bis(projects,
-                                                                        @tokens,
-                                                                        :scope => scope,
-                                                                        :all_words => @all_words,
-                                                                        :titles_only => @titles_only)
+                                                               @tokens,
+                                                               :scope => scope,
+                                                               :all_words => @all_words,
+                                                               :titles_only => @titles_only)
         cond << ' OR '
       end
       cond << '(1 = 2) '
@@ -83,6 +85,10 @@ class ProjectAttachmentsController < ApplicationController
     @attachments_pages = Paginator.new @attachments_count, @limit, params[:page]
     @offset = @attachments_pages.offset
 
-    @attachments = User.current.admin? ? @all_attachments.offset(@offset).limit(@limit) : @all_attachments[@offset..(@offset + @limit - 1)]
+    @attachments = if @all_attachments.is_a? Array
+                     @all_attachments[@offset..(@offset + @limit - 1)]
+                   else
+                     @all_attachments.offset(@offset).limit(@limit)
+                   end
   end
 end
