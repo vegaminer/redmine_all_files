@@ -4,7 +4,7 @@ class ProjectAttachmentsController < ApplicationController
   before_filter :filter
   menu_item :all_files
 
-  @@module_names_to_container_types = { :issue_tracking => 'issues', :news => 'news', :documents => 'documents', :wiki => 'wiki_pages', :files => 'projects' }
+  @@module_names_to_container_types = { :issue_tracking => 'issues', :news => 'news', :documents => 'documents', :wiki => 'wiki_pages', :files => 'projects', :boards => 'messages' }
 
   def index
     params[:project_id].present? ? get_attachment_from_project(params[:project_id]) : get_all_attachments
@@ -85,12 +85,15 @@ class ProjectAttachmentsController < ApplicationController
       # user select container types from available
       scope = scope.select { |t| @scope.include? t }
 
-      cond << Attachment.search_attachments_for_projects_bis(projects,
-                                                             @tokens,
-                                                             :scope => scope,
-                                                             :all_words => @all_words,
-                                                             :titles_only => @titles_only)
-      cond << ' OR '
+      scope_cond = Attachment.search_attachments_for_projects_bis(projects,
+                                                                  @tokens,
+                                                                  :scope => scope,
+                                                                  :all_words => @all_words,
+                                                                  :titles_only => @titles_only)
+      unless scope_cond.empty?
+        cond << scope_cond
+        cond << ' OR '
+      end
     end
     cond << '(1 = 2) '
 

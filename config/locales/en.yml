@@ -9,6 +9,7 @@ en:
   to_news: news
   to_version: version
   to_wiki_page: wiki page
+  to_message: message
   of_the_project: of the project
 
   date:

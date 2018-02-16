@@ -24,6 +24,7 @@ module RedmineAllFiles
                   when 'n', 'd' then str += " OR (LOWER(#{val}.title) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
                   when 'p' then str += " OR (LOWER(#{val}.name) LIKE %{token} OR LOWER(#{val}.identifier) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
                   when 'w' then str += " OR (LOWER(#{val}.title) LIKE %{token})" % { :token => sanitize("%#{token.downcase}%") }
+                  when 'm' then str += " OR (LOWER(#{val}.subject) LIKE %{token} #{ "OR LOWER(#{val}.content) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
                   when 'v' then str += " OR (LOWER(#{val}.name) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
                   else
                 end
@@ -41,6 +42,7 @@ module RedmineAllFiles
           find_by_sql <<-SQL
             SELECT d.title AS document_title, i.subject AS issue_subject, t.name AS issue_tracker_name,
                    n.title AS new_title, v.name AS version_name, w.title AS wiki_page_title, ww.project_id AS wiki_project_id,
+                   m.subject AS message_subject, m.board_id AS message_board_id, m.parent_id AS message_topic_id,
                    p.name AS attachment_project_name, p.id AS attachment_project_id, a.*
             FROM attachments a
 
@@ -49,7 +51,8 @@ module RedmineAllFiles
             LEFT JOIN news n ON n.id = a.container_id AND a.container_type = 'News'
             LEFT JOIN versions v ON v.id = a.container_id AND a.container_type = 'Version'
             LEFT JOIN wiki_pages w ON w.id = a.container_id AND a.container_type = 'WikiPage' LEFT JOIN wikis ww ON ww.id = w.wiki_id
-            LEFT JOIN projects p ON p.id = d.project_id OR p.id = i.project_id OR p.id = n.project_id OR p.id = v.project_id OR p.id = ww.project_id OR p.id = a.container_id AND a.container_type = 'Project'
+            LEFT JOIN messages m ON m.id = a.container_id AND a.container_type = 'Message' LEFT JOIN boards b ON b.id = m.board_id
+            LEFT JOIN projects p ON p.id = d.project_id OR p.id = i.project_id OR p.id = n.project_id OR p.id = v.project_id OR p.id = ww.project_id OR p.id = b.project_id OR p.id = a.container_id AND a.container_type = 'Project'
 
 
             WHERE (d.project_id IN #{sql_project_ids} OR
@@ -67,7 +70,7 @@ module RedmineAllFiles
         end
         def search_attachments_for_projects_bis projects, tokens = [], options = {}
           project_ids = projects
-          return [] if options[:scope].blank? || project_ids.blank?
+          return '' if options[:scope].blank? || project_ids.blank?
           sql_project_ids = "(#{ project_ids.join(', ') })"
 
           containers = options[:scope].map { |container| container.singularize.camelize }
@@ -83,6 +86,7 @@ module RedmineAllFiles
                   when 'n', 'd' then str += " OR (LOWER(#{val}.title) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
                   when 'p' then str += " OR (LOWER(#{val}.name) LIKE %{token} OR LOWER(#{val}.identifier) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
                   when 'w' then str += " OR (LOWER(#{val}.title) LIKE %{token})" % { :token => sanitize("%#{token.downcase}%") }
+                  when 'm' then str += " OR (LOWER(#{val}.subject) LIKE %{token} #{ "OR LOWER(#{val}.content) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
                   when 'v' then str += " OR (LOWER(#{val}.name) LIKE %{token} #{ "OR LOWER(#{val}.description) LIKE %{token}" unless options[:titles_only] })" % { :token => sanitize("%#{token.downcase}%") }
                   else
                 end
@@ -102,6 +106,7 @@ module RedmineAllFiles
                    n.project_id IN #{sql_project_ids} OR
                    v.project_id IN #{sql_project_ids} OR
                    ww.project_id IN #{sql_project_ids} OR
+                   b.project_id IN #{sql_project_ids} OR
                    p.id IN #{sql_project_ids}
                   ) AND (
                    #{ statement }
@@ -116,13 +121,14 @@ module RedmineAllFiles
         end
 
         def selection
-          select("  d.title AS document_title, i.subject AS issue_subject, t.name AS issue_tracker_name, n.title AS new_title, v.name AS version_name, w.title AS wiki_page_title, ww.project_id AS wiki_project_id, p.name AS attachment_project_name, p.id AS attachment_project_id, attachments.*  ").
+          select("  d.title AS document_title, i.subject AS issue_subject, t.name AS issue_tracker_name, n.title AS new_title, v.name AS version_name, w.title AS wiki_page_title, ww.project_id AS wiki_project_id, m.subject AS message_subject, m.board_id AS message_board_id, m.parent_id AS message_topic_id, p.name AS attachment_project_name, p.id AS attachment_project_id, attachments.*  ").
               joins(" LEFT JOIN documents d ON d.id = attachments.container_id AND attachments.container_type = 'Document' ").
               joins("LEFT JOIN issues i ON i.id = attachments.container_id AND attachments.container_type = 'Issue' LEFT JOIN trackers t ON t.id = i.tracker_id ").
               joins("LEFT JOIN news n ON n.id = attachments.container_id AND attachments.container_type = 'News'").
               joins("LEFT JOIN versions v ON v.id = attachments.container_id AND attachments.container_type = 'Version'").
               joins(" LEFT JOIN wiki_pages w ON w.id = attachments.container_id AND attachments.container_type = 'WikiPage' LEFT JOIN wikis ww ON ww.id = w.wiki_id").
-              joins("LEFT JOIN projects p ON p.id = d.project_id OR p.id = i.project_id OR p.id = n.project_id OR p.id = v.project_id OR p.id = ww.project_id OR p.id = attachments.container_id AND attachments.container_type = 'Project'")
+              joins("LEFT JOIN messages m ON m.id = attachments.container_id AND attachments.container_type = 'Message' LEFT JOIN boards b ON b.id = m.board_id").
+              joins("LEFT JOIN projects p ON p.id = d.project_id OR p.id = i.project_id OR p.id = n.project_id OR p.id = v.project_id OR p.id = ww.project_id OR p.id = b.project_id OR p.id = attachments.container_id AND attachments.container_type = 'Project'")
         end
       end
     end

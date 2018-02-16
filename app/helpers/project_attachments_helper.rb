@@ -44,6 +44,7 @@ module ProjectAttachmentsHelper
   # File: File: attachment.filename => project/project_id/file/id
   # Version: Version: name => projects/project_id/versions/id
   # Wiki_page: Wiki page: title => projects/project_id/wiki_pages/id
+  # Message: Message: subject => projects/project_id/messages/id
   def link_to_container_for(attachment)
     link = case attachment.container_type
     when 'Issue' then
@@ -60,6 +61,13 @@ module ProjectAttachmentsHelper
       "#{t('to_document')} #{link_to(attachment.document_title, document_path(attachment.container_id))}"
     when 'News' then
       "#{t('to_news')} #{link_to(attachment.new_title, news_path(attachment.container_id))}"
+    when 'Message' then
+      message_link = if attachment.message_topic_id
+        url_for(:controller => 'messages', :action => 'show', :board_id => attachment.message_board_id, :id => attachment.message_topic_id, :r => attachment.container_id, :anchor => "message-#{attachment.container_id}")
+      else
+        board_message_path(attachment.message_board_id, attachment.container_id)
+      end
+      "#{t('to_message')} #{link_to(attachment.message_subject, message_link)}"
     else
       raise ArgumentError
     end
