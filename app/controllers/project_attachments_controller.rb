@@ -1,7 +1,7 @@
 class ProjectAttachmentsController < ApplicationController
   helper SearchHelper
-  before_filter :find_optional_project
-  before_filter :filter
+  before_action :find_optional_project
+  before_action :filter
   menu_item :all_files
 
   @@module_names_to_container_types = { :issue_tracking => 'issues', :news => 'news', :documents => 'documents', :wiki => 'wiki_pages', :files => 'projects', :boards => 'messages' }

@@ -87,6 +87,14 @@ module ProjectAttachmentsHelper
             #options.merge({ :download => attachment.filename, :target => '_blank' }))
   end
 
+  def link_to_preview(attachment, options={})
+    text = options.delete(:text) || attachment.filename
+    link_to(text, { :controller => 'attachments', :action => 'show',
+            :id => attachment, :filename => attachment.filename },
+            options.merge({ :target => '_blank' }))
+            #options.merge({ :download => attachment.filename, :target => '_blank' }))
+  end
+
   # Returns array with extensions which have appropriate icons
   def available_icons
     ["aiff", "png", "psd", "ics", "dat", "flv", "tiff", "mp3", "dmg", "avi", "ots", "_page", "html",
